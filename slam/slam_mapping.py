@@ -153,14 +153,15 @@ class OccupancyGridSLAM:
             yaw = quaternion_to_yaw(ori.get("x", 0.0), ori.get("y", 0.0), ori.get("z", 0.0), ori.get("w", 1.0))
             new_pose = (float(pos.get("x", 0.0)), float(pos.get("y", 0.0)), float(yaw))
             
-            # Debug: Print odometry updates
+            # Debug: Print odometry updates only for significant changes
             if self._latest_pose_xy_yaw is not None:
                 old_x, old_y, old_yaw = self._latest_pose_xy_yaw
                 new_x, new_y, new_yaw = new_pose
                 dx = new_x - old_x
                 dy = new_y - old_y
                 dyaw = new_yaw - old_yaw
-                if abs(dx) > 0.01 or abs(dy) > 0.01 or abs(dyaw) > 0.01:
+                # Only print if significant movement (reduce logging frequency)
+                if abs(dx) > 0.1 or abs(dy) > 0.1 or abs(dyaw) > 0.1:
                     print(f"[SLAM] Odom update: ({new_x:.3f}, {new_y:.3f}, {math.degrees(new_yaw):.1f}°) [Δ: {dx:.3f}, {dy:.3f}, {math.degrees(dyaw):.1f}°]")
             
             self._latest_pose_xy_yaw = new_pose
@@ -207,11 +208,15 @@ class OccupancyGridSLAM:
         if len(self._scan_history) < 10 or np.count_nonzero(self._grid) < 100:
             # Use odometry directly for pose estimate with minimal correction
             robot_x_m, robot_y_m, yaw = prior_odom
-            print(f"[SLAM] Using odometry directly: ({robot_x_m:.3f}, {robot_y_m:.3f}, {math.degrees(yaw):.1f}°)")
+            # Only print occasionally for the first few scans
+            if len(self._scan_history) % 5 == 0:
+                print(f"[SLAM] Using odometry directly: ({robot_x_m:.3f}, {robot_y_m:.3f}, {math.degrees(yaw):.1f}°)")
         else:
             # Refine pose with scan matching using all beams (no subsampling)
             robot_x_m, robot_y_m, yaw = self._refine_pose_with_scan(prior_odom, angle_min, angle_inc, ranges)
-            print(f"[SLAM] Using scan matching: ({robot_x_m:.3f}, {robot_y_m:.3f}, {math.degrees(yaw):.1f}°)")
+            # Only print scan matching info every 10 scans
+            if len(self._scan_history) % 10 == 0:
+                print(f"[SLAM] Using scan matching: ({robot_x_m:.3f}, {robot_y_m:.3f}, {math.degrees(yaw):.1f}°)")
             
         # Store refined pose for next iteration
         self._pose_estimate_xy_yaw = (robot_x_m, robot_y_m, yaw)
@@ -232,7 +237,9 @@ class OccupancyGridSLAM:
             self._integrate_scan_core(rec)
             self._prob_grid = None
             
-        print(f"[SLAM] Scan {len(self._scan_history)} integrated. Pose: ({robot_x_m:.3f}, {robot_y_m:.3f}, {math.degrees(yaw):.1f}°)")
+        # Only print scan integration info every 10 scans
+        if len(self._scan_history) % 10 == 0:
+            print(f"[SLAM] Scan {len(self._scan_history)} integrated. Pose: ({robot_x_m:.3f}, {robot_y_m:.3f}, {math.degrees(yaw):.1f}°)")
 
     # --- Scan matching utilities ---
     def _ensure_prob_grid(self) -> np.ndarray:
@@ -308,8 +315,8 @@ class OccupancyGridSLAM:
                     except Exception:
                         continue  # Skip invalid poses
         
-        # If no improvement found, stick with odometry
-        if best_pose == prior_pose:
+        # If no improvement found, stick with odometry (reduce logging frequency)
+        if best_pose == prior_pose and len(self._scan_history) % 20 == 0:
             print(f"[SLAM] Scan matching found no improvement, using odometry")
             
         return best_pose
@@ -340,16 +347,18 @@ class OccupancyGridSLAM:
             self._prob_grid = None
             
             # Reintegrate all scans from history
-            print(f"[SLAM] Rebuilding map from {len(self._scan_history)} scans")
+            if len(self._scan_history) > 20:  # Only print for significant rebuilds
+                print(f"[SLAM] Rebuilding map from {len(self._scan_history)} scans")
             for i, rec in enumerate(self._scan_history):
                 self._integrate_scan_core(rec)
-                # Progress indicator for large maps
-                if (i + 1) % 100 == 0:
+                # Progress indicator for large maps (less frequent)
+                if (i + 1) % 200 == 0:
                     print(f"[SLAM] Processed {i + 1}/{len(self._scan_history)} scans")
             
             # Invalidate probability cache after rebuild
             self._prob_grid = None
-            print(f"[SLAM] Map rebuild complete with {len(self._scan_history)} scans integrated")
+            if len(self._scan_history) > 20:  # Only print for significant rebuilds
+                print(f"[SLAM] Map rebuild complete with {len(self._scan_history)} scans integrated")
 
     def _integrate_scan_core(self, rec: dict) -> None:
         """Integrate one scan record into the occupancy grid using its stored pose."""
@@ -403,10 +412,10 @@ class OccupancyGridSLAM:
                 self._grid[cy, cx] = min(self.config.logodds_max, 
                                        self._grid[cy, cx] + self.config.logodds_occ)
         
-        # Debug info for scan integration
+        # Debug info for scan integration (only print warnings for problematic scans)
         if valid_rays == 0:
             print(f"[SLAM] Warning: No valid rays in scan at pose ({px:.2f}, {py:.2f})")
-        elif valid_rays < 10:
+        elif valid_rays < 5:  # Only warn for very low ray counts
             print(f"[SLAM] Warning: Only {valid_rays} valid rays in scan")
 
     def _in_bounds(self, x: int, y: int) -> bool:
