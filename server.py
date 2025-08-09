@@ -6,12 +6,11 @@ from utils.websocket_manager import WebSocketManager
 from msgs.geometry_msgs import Twist
 from msgs.sensor_msgs import Image, JointState
 
-LOCAL_IP = "127.0.0.1"  # Replace with your local IP address
-ROBOT_ID = "14"  # Replace with your robot ID
+ROBOT_ID = "06"  # Replace with your robot ID
 URL = "wss://robohub.eng.uwaterloo.ca/uwbot-" + ROBOT_ID + "-rosbridge/"  # Replace with your rosbridge server IP address
 
 mcp = FastMCP("ros-mcp-server")
-ws_manager = WebSocketManager(URL, LOCAL_IP)
+ws_manager = WebSocketManager(URL)
 twist = Twist(ws_manager, topic="/cmd_vel")
 image = Image(ws_manager, topic="/oakd/rgb/image_raw")
 jointstate = JointState(ws_manager, topic="/joint_states")
@@ -52,6 +51,21 @@ def sub_image():
     
     if msg is not None:
         return "Image data received and downloaded successfully"
+    else:
+        return "No image data received"
+
+@mcp.tool()
+def get_image_base64():
+    """Get image as base64 string for direct display in chat"""
+    img_base64 = image.get_base64_image()
+    ws_manager.close()
+    
+    if img_base64 is not None:
+        return {
+            "image_data": img_base64,
+            "format": "data:image/png;base64," + img_base64,
+            "message": "Image captured successfully"
+        }
     else:
         return "No image data received"
 
