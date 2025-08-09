@@ -5,7 +5,6 @@ import json
 from utils.websocket_manager import WebSocketManager
 from msgs.geometry_msgs import Twist
 from msgs.sensor_msgs import Image, JointState
-from contextlib import asynccontextmanager
 
 LOCAL_IP = "127.0.0.1"  # Replace with your local IP address
 ROBOT_ID = "08"  # Replace with your robot ID
@@ -17,16 +16,6 @@ twist = Twist(ws_manager, topic="/cmd_vel")
 image = Image(ws_manager, topic="/oakd/rgb/image_raw")
 jointstate = JointState(ws_manager, topic="/joint_states")
 
-
-@asynccontextmanager
-async def lifespan(app: FastMCP):
-    # Startup logic
-    await ws_manager.connect()
-    try:
-        yield
-    finally:
-        # Shutdown logic
-        ws_manager.close()
 
 @mcp.tool()
 def get_topics():
@@ -65,21 +54,6 @@ def sub_image():
         return "No image data received"
 
 @mcp.tool()
-def get_image_base64():
-    """Get image as base64 string for direct display in chat"""
-    img_base64 = image.get_base64_image()
-    ws_manager.close()
-    
-    if img_base64 is not None:
-        return {
-            "image_data": img_base64,
-            "format": "data:image/png;base64," + img_base64,
-            "message": "Image captured successfully"
-        }
-    else:
-        return "No image data received"
-
-@mcp.tool()
 def pub_jointstate(name: list[str], position: list[float], velocity: list[float], effort: list[float]):
     msg = jointstate.publish(name, position, velocity, effort)
     if msg is not None:
@@ -105,6 +79,9 @@ if __name__ == "__main__":
         choices=["streamable-http", "stdio"],
     )
     args = parser.parse_args()
-    mcp.run(transport=args.transport)
-    
+                
+    try:
+        mcp.run(transport=args.transport)
+    finally:
+        ws_manager.close()
     
