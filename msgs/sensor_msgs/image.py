@@ -18,7 +18,7 @@ class Image:
         self.subscriber = subscriber
         self.topic = topic
 
-    def subscribe(self, save_path: Optional[str] = None) -> Optional[bytes]:
+    def subscribe(self, save_path: Optional[str] = None, return_base64: bool = False) -> Optional[bytes]:
         try:
             subscribe_msg = {
                 "op": "subscribe",
@@ -71,8 +71,22 @@ class Image:
             Path(save_path).parent.mkdir(parents=True, exist_ok=True)
             cv2.imwrite(str(save_path), img_cv)
             print(f"[Image] Saved to {save_path}")
+            
+            # Return base64 data if requested
+            if return_base64:
+                # Convert BGR to RGB for web display
+                img_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
+                # Encode to PNG and then to base64
+                _, buffer = cv2.imencode('.png', img_rgb)
+                img_base64 = base64.b64encode(buffer).decode('utf-8')
+                return img_base64
+            
             return img_cv
 
         except Exception as e:
             print(f"[Image] Failed to receive or decode: {e}")
             return None
+
+    def get_base64_image(self) -> Optional[str]:
+        """Get image as base64 string for direct display"""
+        return self.subscribe(return_base64=True)
