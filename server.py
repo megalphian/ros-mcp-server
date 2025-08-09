@@ -115,12 +115,24 @@ def sub_jointstate():
         return "No JointState data received"
       
 @mcp.tool()
-def get_scan_data():
+def get_scan_data(min_angle: float, max_angle: float):
     scan_data = laserscan.subscribe()
     ws_manager.close()
     
     if scan_data is not None:
-        return scan_data
+        # Filter scan data based on angle range
+        filtered_data = [
+            r for i, r in enumerate(scan_data["ranges"])
+            if scan_data["angle_min"] + i * scan_data["angle_increment"] >= min_angle
+            and scan_data["angle_min"] + i * scan_data["angle_increment"] <= max_angle
+        ]
+        return {
+            "angle_min": min_angle,
+            "angle_max": max_angle,
+            "angle_increment": scan_data["angle_increment"],
+            "ranges": filtered_data,
+            "intensities": scan_data.get("intensities", [])
+        }
     else:
         return "No laser scan data received"
 
