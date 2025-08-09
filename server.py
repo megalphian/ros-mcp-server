@@ -8,9 +8,31 @@ from msgs.turtlebot4_msgs import UserButton, UserLed
 from msgs.nav_msgs import Odometry
 from slam.slam_mapping import OccupancyGridSLAM
 
-# Configure target robot and rosbridge URL
-ROBOT_ID = "11"  # Replace with your robot ID
-URL = "wss://robohub.eng.uwaterloo.ca/uwbot-" + ROBOT_ID + "-rosbridge/"  # Replace with your rosbridge server IP address
+import json
+
+# Function to load configuration
+def load_config(config_path="config.json"):
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        return config
+    except FileNotFoundError:
+        print(f"Configuration file not found at {config_path}. Using default values.")
+        return {} # Return empty dict to use defaults
+    except json.JSONDecodeError:
+        print(f"Error decoding JSON from {config_path}. Using default values.")
+        return {}
+
+# Load configuration
+config = load_config()
+
+# Use configuration values or defaults
+LOCAL_IP = config.get("LOCAL_IP", "127.0.0.1")
+ROBOT_ID = config.get("ROBOT_ID", "12")
+ROSBRIDGE_URL_BASE = config.get("ROSBRIDGE_URL_BASE", "wss://robohub.eng.uwaterloo.ca/uwbot-")
+ROSBRIDGE_URL_SUFFIX = config.get("ROSBRIDGE_URL_SUFFIX", "-rosbridge/")
+
+URL = ROSBRIDGE_URL_BASE + ROBOT_ID + ROSBRIDGE_URL_SUFFIX
 
 # Initialize MCP server and shared WebSocket transport
 mcp = FastMCP("ros-mcp-server")
@@ -43,10 +65,7 @@ def get_topics():
 
     if topic_info:
         topics, types = zip(*topic_info)
-        return {
-            "topics": list(topics),
-            "types": list(types)
-        }
+        return {"topics": list(topics), "types": list(types)}
     else:
         return "No topics found"
 
@@ -63,7 +82,7 @@ def pub_twist(linear: List[Any], angular: List[Any]):
     """
     msg = twist.publish(linear, angular)
     ws_manager.close()
-    
+
     if msg is not None:
         return "Twist message published successfully"
     else:
@@ -80,7 +99,6 @@ def pub_twist_seq(linear: List[Any], angular: List[Any], duration: List[Any]):
     """
     twist.publish_sequence(linear, angular, duration)
 
-
 @mcp.tool()
 def sub_image():
     """Capture one image from the camera topic and save it to `screenshots/`.
@@ -90,7 +108,7 @@ def sub_image():
     """
     msg = image.subscribe()
     ws_manager.close()
-    
+
     if msg is not None:
         return "Image data received and downloaded successfully"
     else:
@@ -145,7 +163,7 @@ def sub_jointstate():
         return msg
     else:
         return "No JointState data received"
-
+      
 @mcp.tool()
 def get_scan_data():
     """Subscribe once to `/scan` and return the latest sensor_msgs/LaserScan as dict."""
