@@ -7,6 +7,8 @@ from msgs.irobot_create_msgs import AudioNoteVector, LightringLeds, DockStatus
 from msgs.turtlebot4_msgs import UserButton, UserLed
 from msgs.nav_msgs import Odometry
 
+import json
+
 # Function to load configuration
 def load_config(config_path="config.json"):
     try:
