@@ -35,6 +35,7 @@ mcp = FastMCP("ros-mcp-server")
 ws_manager = WebSocketManager(URL)
 twist = Twist(ws_manager, topic="/cmd_vel")
 image = Image(ws_manager, topic="/oakd/rgb/image_raw")
+depth = Image(ws_manager, topic="/stereo/depth")
 jointstate = JointState(ws_manager, topic="/joint_states")
 laserscan = LaserScan(ws_manager, topic="/scan")
 audio = AudioNoteVector(ws_manager, topic="/cmd_audio")
@@ -57,6 +58,9 @@ def get_topics():
 
 @mcp.tool()
 def pub_twist(linear: List[Any], angular: List[Any]):
+    if len(linear) != 3 or len(angular) != 3:
+        return "Linear and angular velocities must be lists of 3 elements each."
+
     msg = twist.publish(linear, angular)
     ws_manager.close()
 
@@ -70,8 +74,8 @@ def pub_twist_seq(linear: List[Any], angular: List[Any], duration: List[Any]):
     twist.publish_sequence(linear, angular, duration)
 
 @mcp.tool()
-def sub_image():
-    msg = image.subscribe()
+def save_image():
+    msg = image.subscribe(save=True)
     ws_manager.close()
 
     if msg is not None:

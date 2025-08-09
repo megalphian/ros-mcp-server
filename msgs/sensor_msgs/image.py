@@ -18,7 +18,7 @@ class Image:
         self.subscriber = subscriber
         self.topic = topic
 
-    def subscribe(self, save_path: Optional[str] = None, return_base64: bool = False) -> Optional[bytes]:
+    def subscribe(self, save : bool = False, save_path: Optional[str] = None) -> Optional[bytes]:
         try:
             subscribe_msg = {
                 "op": "subscribe",
@@ -60,27 +60,19 @@ class Image:
                 print(f"[Image] Unsupported encoding: {encoding}")
                 return None
 
-            # Save image
-            if save_path is None:
-                downloads_dir = Path(__file__).resolve().parents[2] / "screenshots"
-                if not downloads_dir.exists():
-                    downloads_dir.mkdir(parents=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                save_path = downloads_dir / f"{timestamp}.png"
+            if save:
+                # Save image
+                if save_path is None:
+                    downloads_dir = Path(__file__).resolve().parents[2] / "screenshots"
+                    if not downloads_dir.exists():
+                        downloads_dir.mkdir(parents=True)
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    save_path = downloads_dir / f"{timestamp}.png"
 
-            Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-            cv2.imwrite(str(save_path), img_cv)
-            print(f"[Image] Saved to {save_path}")
-            
-            # Return base64 data if requested
-            if return_base64:
-                # Convert BGR to RGB for web display
-                img_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
-                # Encode to PNG and then to base64
-                _, buffer = cv2.imencode('.png', img_rgb)
-                img_base64 = base64.b64encode(buffer).decode('utf-8')
-                return img_base64
-            
+                Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+                cv2.imwrite(str(save_path), img_cv)
+                print(f"[Image] Saved to {save_path}")
+
             return img_cv
 
         except Exception as e:
