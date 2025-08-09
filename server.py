@@ -1,5 +1,6 @@
 from mcp.server.fastmcp import FastMCP
 from typing import List, Any
+import json
 from utils.websocket_manager import WebSocketManager
 from msgs.geometry_msgs import Twist
 from msgs.sensor_msgs import Image, JointState, LaserScan
@@ -48,7 +49,6 @@ odometry = Odometry(ws_manager, topic="/odom")
 @mcp.tool()
 def get_topics():
     topic_info = ws_manager.get_topics()
-    ws_manager.close()
 
     if topic_info:
         topics, types = zip(*topic_info)
@@ -62,7 +62,6 @@ def pub_twist(linear: List[Any], angular: List[Any]):
         return "Linear and angular velocities must be lists of 3 elements each."
 
     msg = twist.publish(linear, angular)
-    ws_manager.close()
 
     if msg is not None:
         return "Twist message published successfully"
@@ -76,7 +75,6 @@ def pub_twist_seq(linear: List[Any], angular: List[Any], duration: List[Any]):
 @mcp.tool()
 def save_image():
     msg = image.subscribe(save=True)
-    ws_manager.close()
 
     if msg is not None:
         return "Image data received and downloaded successfully"
@@ -87,7 +85,6 @@ def save_image():
 def get_image_base64():
     """Get image as base64 string for direct display in chat"""
     img_base64 = image.get_base64_image()
-    ws_manager.close()
     
     if img_base64 is not None:
         return {
@@ -101,7 +98,6 @@ def get_image_base64():
 @mcp.tool()
 def pub_jointstate(name: list[str], position: list[float], velocity: list[float], effort: list[float]):
     msg = jointstate.publish(name, position, velocity, effort)
-    ws_manager.close()
     if msg is not None:
         return "JointState message published successfully"
     else:
@@ -110,7 +106,6 @@ def pub_jointstate(name: list[str], position: list[float], velocity: list[float]
 @mcp.tool()
 def sub_jointstate():
     msg = jointstate.subscribe()
-    ws_manager.close()
     if msg is not None:
         return msg
     else:
@@ -119,7 +114,6 @@ def sub_jointstate():
 @mcp.tool()
 def get_scan_data():
     scan_data = laserscan.subscribe()
-    ws_manager.close()
     
     if scan_data is not None:
         return scan_data
@@ -129,7 +123,6 @@ def get_scan_data():
 @mcp.tool()
 def play_audio(notes: List[Any], append: bool = False):
     msg = audio.publish(notes, append)
-    ws_manager.close()
     
     if msg is not None:
         return "Audio command published successfully"
@@ -139,7 +132,6 @@ def play_audio(notes: List[Any], append: bool = False):
 @mcp.tool()
 def set_lightring(leds: List[Any]):
     msg = lightring.publish(leds)
-    ws_manager.close()
     
     if msg is not None:
         return "Lightring command published successfully"
@@ -149,7 +141,6 @@ def set_lightring(leds: List[Any]):
 @mcp.tool()
 def get_dock_status():
     status = dockstatus.subscribe()
-    ws_manager.close()
     
     if status is not None:
         return status
@@ -159,7 +150,6 @@ def get_dock_status():
 @mcp.tool()
 def get_button_state():
     state = userbutton.subscribe()
-    ws_manager.close()
     
     if state is not None:
         return state
@@ -169,7 +159,6 @@ def get_button_state():
 @mcp.tool()
 def set_user_led(led: int, color: int, blink_period: float, duty_cycle: float):
     msg = userled.publish(led, color, blink_period, duty_cycle)
-    ws_manager.close()
     
     if msg is not None:
         return "User LED command published successfully"
@@ -179,7 +168,6 @@ def set_user_led(led: int, color: int, blink_period: float, duty_cycle: float):
 @mcp.tool()
 def get_odometry_data():
     odom_data = odometry.subscribe()
-    ws_manager.close()
     
     if odom_data is not None:
         return odom_data
@@ -187,4 +175,17 @@ def get_odometry_data():
         return "No odometry data received"
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    import argparse
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--transport',
+        default="streamable-http",
+        choices=["streamable-http", "stdio"],
+    )
+    args = parser.parse_args()
+                
+    try:
+        mcp.run(transport=args.transport)
+    finally:
+        ws_manager.close()
