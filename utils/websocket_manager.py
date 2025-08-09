@@ -1,12 +1,9 @@
-import socket
 import json
 import websocket._core as websocket
-import base64
 
 class WebSocketManager:
-    def __init__(self, url: str, local_ip: str):
+    def __init__(self, url: str):
         self.url = url
-        self.local_ip = local_ip
         self.ws = None
 
     def connect(self):
