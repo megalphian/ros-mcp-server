@@ -78,3 +78,30 @@ This is the list of tools exposed by the ROS MCP Server, with parameters and ret
   - **blink_period**: float seconds; 0 for solid
   - **duty_cycle**: float 0.0–1.0
 - **returns**: status string
+
+## slam_start
+- **purpose**: Start a background in-memory occupancy grid SLAM loop using `/scan` and `/odom`.
+- **params**:
+  - **scan_topic**: string, default `/scan`
+  - **odom_topic**: string, default `/odom`
+- **returns**: status string
+
+## slam_stop
+- **purpose**: Stop the SLAM background loop and close its connection.
+- **returns**: status string
+
+## slam_reset_map
+- **purpose**: Clear the occupancy grid to unknown state.
+- **returns**: status string
+
+## slam_get_map
+- **purpose**: Get the current occupancy grid data and metadata.
+- **returns**: `{ metadata: { resolution, width, height, origin }, data: list[int] }` where data is 0..100 and -1 for unknown
+
+## slam_get_map_image
+- **purpose**: Get the current occupancy grid as a base64 PNG for visualization.
+- **returns**: `{ image_data: str, format: "data:image/png;base64,<...>" }` or string when unavailable
+
+## slam_get_stats
+- **purpose**: Get SLAM statistics for debugging and monitoring.
+- **returns**: `{ total_scans: int, odom_history_length: int, current_pose: [x, y, yaw], latest_odom: [x, y, yaw], grid_occupancy_stats: { min_logodds, max_logodds, mean_logodds, non_zero_cells } }` or string when unavailable

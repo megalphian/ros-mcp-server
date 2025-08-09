@@ -6,9 +6,10 @@ from msgs.sensor_msgs import Image, JointState, LaserScan
 from msgs.irobot_create_msgs import AudioNoteVector, LightringLeds, DockStatus
 from msgs.turtlebot4_msgs import UserButton, UserLed
 from msgs.nav_msgs import Odometry
+from slam.slam_mapping import OccupancyGridSLAM
 
 # Configure target robot and rosbridge URL
-ROBOT_ID = "14"  # Replace with your robot ID
+ROBOT_ID = "11"  # Replace with your robot ID
 URL = "wss://robohub.eng.uwaterloo.ca/uwbot-" + ROBOT_ID + "-rosbridge/"  # Replace with your rosbridge server IP address
 
 # Initialize MCP server and shared WebSocket transport
@@ -26,6 +27,9 @@ dockstatus = DockStatus(ws_manager, topic="/dock_status")
 userbutton = UserButton(ws_manager, topic="/hmi/buttons")
 userled = UserLed(ws_manager, topic="/hmi/led")
 odometry = Odometry(ws_manager, topic="/odom")
+
+# SLAM instance (separate websocket connection) created lazily
+_slam_instance: OccupancyGridSLAM | None = None
 
 @mcp.tool()
 def get_topics():
@@ -246,6 +250,71 @@ def get_odometry_data():
         return odom_data
     else:
         return "No odometry data received"
+
+
+@mcp.tool()
+def slam_start(scan_topic: str = "/scan", odom_topic: str = "/odom"):
+    """Start in-memory occupancy grid SLAM using LaserScan and Odometry.
+
+    Parameters:
+        scan_topic: topic name for sensor_msgs/LaserScan
+        odom_topic: topic name for nav_msgs/Odometry
+    """
+    global _slam_instance
+    if _slam_instance is None:
+        _slam_instance = OccupancyGridSLAM(URL, scan_topic=scan_topic, odom_topic=odom_topic)
+    else:
+        _slam_instance.stop()
+        _slam_instance = OccupancyGridSLAM(URL, scan_topic=scan_topic, odom_topic=odom_topic)
+    _slam_instance.start()
+    return "SLAM started"
+
+
+@mcp.tool()
+def slam_stop():
+    """Stop the SLAM background loop and close its connection."""
+    global _slam_instance
+    if _slam_instance is None:
+        return "SLAM not running"
+    _slam_instance.stop()
+    _slam_instance = None
+    return "SLAM stopped"
+
+
+@mcp.tool()
+def slam_reset_map():
+    """Clear the occupancy grid to unknown state."""
+    if _slam_instance is None:
+        return "SLAM not running"
+    _slam_instance.reset_map()
+    return "Map reset"
+
+
+@mcp.tool()
+def slam_get_map():
+    """Get the current occupancy grid as metadata and flattened data array (ROS-like)."""
+    if _slam_instance is None:
+        return "SLAM not running"
+    return _slam_instance.get_map_data()
+
+
+@mcp.tool()
+def slam_get_map_image():
+    """Get the current occupancy grid as a base64 PNG image string."""
+    if _slam_instance is None:
+        return "SLAM not running"
+    img_b64 = _slam_instance.get_map_image_base64()
+    if img_b64:
+        return {"image_data": img_b64, "format": "data:image/png;base64," + img_b64}
+    return "No map image available"
+
+
+@mcp.tool()
+def slam_get_stats():
+    """Get SLAM statistics including scan count, pose info, and grid occupancy stats."""
+    if _slam_instance is None:
+        return "SLAM not running"
+    return _slam_instance.get_slam_stats()
 
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")
